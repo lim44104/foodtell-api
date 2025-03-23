@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 import psycopg2
 import psycopg2.extras
@@ -25,20 +25,32 @@ def home():
 @app.route('/restaurants', methods=['GET'])
 def get_restaurants():
     try:
+        mall = request.args.get('mall')  # 🆕 Get the optional mall query param
+
         # Connect to PostgreSQL
         conn = psycopg2.connect(app.config['DATABASE_URI'])
         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-        # Query all restaurants
-        cursor.execute("""
-            SELECT restaurantid, name, rating, pricerange, address, phoneno,
-                   websiteurl, menuurl, reservationurl, eaterycategory, description,
-                   tags, reviewkeywords, openinghours, latlng, reviewcount,
-                   featuredimage, mall
-            FROM restaurant
-        """)
-        rows = cursor.fetchall()
+        # Conditional SQL based on whether 'mall' is provided
+        if mall:
+            cursor.execute("""
+                SELECT restaurantid, name, rating, pricerange, address, phoneno,
+                       websiteurl, menuurl, reservationurl, eaterycategory, description,
+                       tags, reviewkeywords, openinghours, latlng, reviewcount,
+                       featuredimage, mall
+                FROM restaurant
+                WHERE mall = %s
+            """, (mall,))
+        else:
+            cursor.execute("""
+                SELECT restaurantid, name, rating, pricerange, address, phoneno,
+                       websiteurl, menuurl, reservationurl, eaterycategory, description,
+                       tags, reviewkeywords, openinghours, latlng, reviewcount,
+                       featuredimage, mall
+                FROM restaurant
+            """)
 
+        rows = cursor.fetchall()
         restaurant_list = []
 
         for row in rows:
@@ -53,7 +65,7 @@ def get_restaurants():
             def clean(val):
                 return None if str(val).strip() in ("NaN", "nan", "None", "") else val
 
-            # Fix: Parse latlng string safely
+            # Parse latlng safely
             lat, lng = None, None
             if row['latlng']:
                 try:
